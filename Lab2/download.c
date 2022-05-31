@@ -12,9 +12,17 @@ int main(int argc, char *argv[])
     }
 
     parse_input(argv[1], &data);
-    struct hostent *ent = getIP(data); 
+	print_data_struct(&data);
 
-    print_data_struct(&data);
+    struct hostent *h = getIP(data); 
+	char *ip = inet_ntoa(*((struct in_addr *)h->h_addr));
+
+	printf("Requesting socket to port 21\n");
+	int socket_request = socket_config(ip, SERVER_PORT);
+
+
+
+
 
     
 
@@ -54,6 +62,24 @@ int socket_config (char *ip, int port)
 	exit(0);*/
 
 	return sockfd;
+}
+
+char *read_socket_reply(int socketfd)
+{
+	char *buf = malloc(1024);
+	ssize_t n = 0;
+	ssize_t read;
+
+	FILE* fd = fdopen(socketfd, "r");
+	while(fgets(buf, 1024, fd) == buf) 
+	{
+		if(buf[3] == ' ') break;
+	}
+
+	buf[1023] = '\0';
+	printf("Reply: %s\n", buf);
+
+	return buf;
 }
 
 

@@ -30,7 +30,6 @@ void parse_input(char * arg, requestedData * data)
     }
     else
     {
-        printf("%s", arg);
         token = strtok(arg, ":");
         strcpy(data->user, token);
         token = strtok(NULL, "@");
