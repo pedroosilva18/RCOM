@@ -7,7 +7,7 @@ int main(int argc, char *argv[])
 
     requestedData data;
     if(argc != 2){
-        printf("Invalid arguments. Exemple:: ftp://[<user>:<password>@]<host>/<url-path>\n");
+        printf("Invalid arguments. Example:: ftp://[<user>:<password>@]<host>/<url-path>\n");
         return -1;
     }
 
@@ -19,14 +19,44 @@ int main(int argc, char *argv[])
 
 	printf("Requesting socket to port 21\n");
 	int socket_request = socket_config(ip, SERVER_PORT);
+	printf("Connected\n");
+
+	socketFile = fdopen(socket_request, "r");
+	readResponse();
+
+  	// login
+	char command[1024];
+	sprintf(command, "user %s\r\n", data.user);
+	sendCommand(socket_request, command);
+	if (readResponse() != 0) return 1;
+	sprintf(command, "pass %s\r\n", data.password);
+	sendCommand(socket_request, command);
+	if (readResponse() != 0) return 1;
+
+	sprintf(command, "pasv\r\n");
+  	sendCommand(socket_request, command);
 
 
+	/*
+	char buf[1000000];
+	printf("\n\n");
+	while(1)
+	{
+	 	ssize_t a = read(socket_request, &buf, 1000);
+		printf("\n%ld -- %s\n", a,buf); 
+	}
 
-
-
+*/
+  	
+	
+	/*char buf[2048] = "12345";
+	int buf_size;
+	//buf_size = read_socket_reply(socket_request, buf);
+	/*buf_size = send(socket_request, buf, strlen(buf), 0);
+	printf("Bytes escritos %d\n", buf_size);*/
     
 
-    return 0;
+	return 0;
 }
 
 int socket_config (char *ip, int port)
@@ -55,38 +85,52 @@ int socket_config (char *ip, int port)
 		exit(0);
 		}
     	/*send a string to the server*/
-	/*bytes = write(sockfd, buf, strlen(buf));
-	printf("Bytes escritos %d\n", bytes);*/
+	
 
 	/*close(sockfd);
 	exit(0);*/
 
+
 	return sockfd;
 }
-
-char *read_socket_reply(int socketfd)
-{
-	char *buf = malloc(1024);
-	ssize_t n = 0;
-	ssize_t read;
-
-	FILE* fd = fdopen(socketfd, "r");
-	while(fgets(buf, 1024, fd) == buf) 
-	{
-		if(buf[3] == ' ') break;
-	}
-
-	buf[1023] = '\0';
-	printf("Reply: %s\n", buf);
-
-	return buf;
+int sendCommand(int socketfd, char * command){
+  printf(" about to send command: \n> %s", command);
+  int sent = send(socketfd, command, strlen(command), 0);
+  if (sent == 0){
+    printf("sendCommand: Connection closed");
+    return 1;
+  }
+  if (sent == -1){
+    printf("sendCommand: error");
+    return 2;
+  }
+  printf("> command sent\n");
+  return 0;
 }
 
+int readResponse(){
+  char * buf;
+	size_t bytesRead = 0;
+
+  while (1){
+    getline(&buf, &bytesRead, socketFile);
+    printf("< %s", buf);
+    if (buf[3] == ' '){
+      long code = strtol(buf, &buf, 10);
+      if (code == 550 || code == 530)
+      {
+        printf("Command error\n");
+        return 1;
+      }
+      break;
+    }
+  }
+  return 0;
+}
 
 struct hostent *getIP(requestedData data)
 {
     struct hostent *h;
-    
     if ((h=gethostbyname(data.host)) == NULL) 
 	{  
         herror("gethostbyname");
@@ -94,7 +138,7 @@ struct hostent *getIP(requestedData data)
     }
 
     printf("Host name  : %s\n", h->h_name);
-    printf("IP Address : %s\n",inet_ntoa(*((struct in_addr *)h->h_addr_list)));
+    printf("IP Address : %s\n",inet_ntoa(*((struct in_addr *)h->h_addr)));
 
     return h;
 }

@@ -15,6 +15,8 @@
 
 #include "macros.h"
 
+FILE *socketFile;
+
 typedef struct requested_data{
     char user[MAX_STRING_SIZE]; 
     char password[MAX_STRING_SIZE];  
@@ -23,10 +25,13 @@ typedef struct requested_data{
     char file_name[MAX_STRING_SIZE];
 } requestedData;
 
+
 void parse_input(char *arg, requestedData * data);
 void print_data_struct(requestedData * data);
 
 int socket_config (char *ip, int port);
+int readResponse();
+int sendCommand(int socketfd, char * command);
 
 struct hostent *getIP(requestedData data);
 
