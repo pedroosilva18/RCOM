@@ -3,9 +3,10 @@
 #include "macros.h"
 
 int main(int argc, char *argv[])
-{
+{	
 
     requestedData data;
+
     if(argc != 2){
         printf("Invalid arguments. Example:: ftp://[<user>:<password>@]<host>/<url-path>\n");
         return -1;
@@ -21,8 +22,8 @@ int main(int argc, char *argv[])
 	int socket_request = socket_config(ip, SERVER_PORT);
 	printf("Connected\n");
 
-	socketFile = fdopen(socket_request, "r");
-	readResponse();
+	FILE *socketFile = fdopen(socket_request, "r");
+	readResponse(socketFile);
 
   	// login
 	char command[1024];
@@ -108,7 +109,7 @@ int sendCommand(int socketfd, char * command){
   return 0;
 }
 
-int readResponse(){
+int readResponse(FILE *socketFile){
   char * buf;
 	size_t bytesRead = 0;
 

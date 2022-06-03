@@ -15,7 +15,6 @@
 
 #include "macros.h"
 
-FILE *socketFile;
 
 typedef struct requested_data{
     char user[MAX_STRING_SIZE]; 
