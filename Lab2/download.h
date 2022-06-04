@@ -29,8 +29,8 @@ void parse_input(char *arg, requestedData * data);
 void print_data_struct(requestedData * data);
 
 int socket_config (char *ip, int port);
-int readResponse();
-int sendCommand(int socketfd, char * command);
+int read_reply(int socketfd);
+int send_command(int socketfd, char * command);
 
 struct hostent *getIP(requestedData data);
 

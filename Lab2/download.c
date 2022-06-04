@@ -22,21 +22,37 @@ int main(int argc, char *argv[])
 	int socket_request = socket_config(ip, SERVER_PORT);
 	printf("Connected\n");
 
-	FILE *socketFile = fdopen(socket_request, "r");
-	readResponse(socketFile);
+	if (read_reply(socket_request) != 0)
+	{
+		printf("ERROR IN COMMANDS\n");
+		close(socket_request);
+		return -1;
+	}
 
   	// login
-	char command[1024];
-	sprintf(command, "user %s\r\n", data.user);
-	sendCommand(socket_request, command);
-	if (readResponse() != 0) return 1;
-	sprintf(command, "pass %s\r\n", data.password);
-	sendCommand(socket_request, command);
-	if (readResponse() != 0) return 1;
+	char command[MAX_STRING_SIZE*2];
+	sprintf(command, "user %s", data.user);
+	printf ("COMMAND: %s\n", command);
+	send_command(socket_request, command);
+	if (read_reply(socket_request) != 0)
+	{
+		printf("ERROR IN COMMANDS\n");
+		close(socket_request);
+		return -1;
+	}
+	
+	sprintf(command, "%s", data.password);
+	printf ("COMMAND: %s\n", command);
+	send_command(socket_request, command);
+	if (read_reply(socket_request) != 0)
+	{
+		printf("ERROR IN COMMANDS\n");
+		close(socket_request);
+		return -1;
+	}
 
-	sprintf(command, "pasv\r\n");
-  	sendCommand(socket_request, command);
-
+	send_command(socket_request, "pasv");
+	
 
 	/*
 	char buf[1000000];
@@ -94,39 +110,44 @@ int socket_config (char *ip, int port)
 
 	return sockfd;
 }
-int sendCommand(int socketfd, char * command){
-  printf(" about to send command: \n> %s", command);
-  int sent = send(socketfd, command, strlen(command), 0);
-  if (sent == 0){
-    printf("sendCommand: Connection closed");
-    return 1;
-  }
-  if (sent == -1){
-    printf("sendCommand: error");
-    return 2;
-  }
-  printf("> command sent\n");
-  return 0;
+int send_command(int socketfd, char *command)
+{
+	printf("/**** Sending Commands ****/\n");
+	
+	int bytes_sent = send(socketfd, command, strlen(command), 0);
+	//printf("OH CUM CRL\n");
+	if (bytes_sent < 0)
+	{
+		printf("Error Sending Command\n");
+		return -1;
+	}
+	
+	printf("Command sent: %s with %d bytes\n", command, bytes_sent);
+	return 0;
 }
 
-int readResponse(FILE *socketFile){
-  char * buf;
-	size_t bytesRead = 0;
+int read_reply(int socketfd)
+{
+	char *buf = malloc(MAX_STRING_SIZE);
+	ssize_t random = 0;
+	FILE *file = fdopen(socketfd, "r");
 
-  while (1){
-    getline(&buf, &bytesRead, socketFile);
-    printf("< %s", buf);
-    if (buf[3] == ' '){
-      long code = strtol(buf, &buf, 10);
-      if (code == 550 || code == 530)
-      {
-        printf("Command error\n");
-        return 1;
-      }
-      break;
-    }
-  }
-  return 0;
+	//printf("LEL\n");
+	while (getline(&buf, &random, file) != -1)
+	{
+		printf("< %s", buf);
+		//printf("LET ME SEE\n");
+		if (buf[3] == ' ')
+			break;
+		//printf("IM KILLING U BITCH\n");
+		if (buf[0] == '4' || buf[0] == '5')
+		{
+			printf("ERROR READING RESPONSE\n");
+			close(socketfd);
+			return -1;
+		}
+	}
+	return 0;
 }
 
 struct hostent *getIP(requestedData data)
