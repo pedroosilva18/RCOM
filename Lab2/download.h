@@ -12,6 +12,8 @@
 #include <signal.h>
 #include <netdb.h>
 #include <strings.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "macros.h"
 
@@ -29,8 +31,10 @@ void parse_input(char *arg, requestedData * data);
 void print_data_struct(requestedData * data);
 
 int socket_config (char *ip, int port);
-int read_reply(int socketfd);
+int read_reply(FILE * socketfd, char copy[]);
 int send_command(int socketfd, char * command);
+int pasv_mode(int socketfd);
+int download(int socketfd, char *filename);
 
 struct hostent *getIP(requestedData data);
 

@@ -2,6 +2,7 @@
 #include "download.h"
 #include "macros.h"
 
+int cmd_num = 0;
 int main(int argc, char *argv[])
 {	
 
@@ -22,56 +23,81 @@ int main(int argc, char *argv[])
 	int socket_request = socket_config(ip, SERVER_PORT);
 	printf("Connected\n");
 
-	if (read_reply(socket_request) != 0)
+	FILE * socket_data = fdopen(socket_request, "r");
+
+	if (read_reply(socket_data, NULL) != 0)
 	{
 		printf("ERROR IN COMMANDS\n");
 		close(socket_request);
+		fclose(socket_data);
 		return -1;
 	}
 
   	// login
 	char command[MAX_STRING_SIZE*2];
-	sprintf(command, "user %s", data.user);
+	sprintf(command, "user %s\n", data.user);
 	printf ("COMMAND: %s\n", command);
 	send_command(socket_request, command);
-	if (read_reply(socket_request) != 0)
+	if (read_reply(socket_data, NULL) != 0)
+	{
+		printf("ERROR IN COMMANDS\n");
+		close(socket_request);
+		fclose(socket_data);
+		return -1;
+	}
+	
+	sprintf(command, "pass %s\n", data.password);
+	printf ("COMMAND: %s\n", command);
+	send_command(socket_request, command);
+	if (read_reply(socket_data, NULL) != 0)
+	{
+		printf("ERROR IN COMMANDS\n");
+		close(socket_request);
+		fclose(socket_data);
+		return -1;
+	}
+	
+	int porta;
+	if((porta = pasv_mode(socket_request)) < 0)
 	{
 		printf("ERROR IN COMMANDS\n");
 		close(socket_request);
 		return -1;
 	}
-	
-	sprintf(command, "%s", data.password);
+
+	printf("Requesting socket to port %d\n", porta);
+	int download_fd = socket_config(ip, porta);
+	printf("Connected\n");
+
+	sprintf(command, "retr %s\n", data.url_path);
 	printf ("COMMAND: %s\n", command);
 	send_command(socket_request, command);
-	if (read_reply(socket_request) != 0)
+	if (read_reply(socket_data, NULL) != 0)
 	{
 		printf("ERROR IN COMMANDS\n");
 		close(socket_request);
+		fclose(socket_data);
+		close(download_fd);
 		return -1;
 	}
 
-	send_command(socket_request, "pasv");
-	
-
-	/*
-	char buf[1000000];
-	printf("\n\n");
-	while(1)
+	if(download(download_fd, data.file_name)!=0)
 	{
-	 	ssize_t a = read(socket_request, &buf, 1000);
-		printf("\n%ld -- %s\n", a,buf); 
+		printf("ERROR DOWNLOADING FILE\n");
+		close(socket_request);
+		fclose(socket_data);
+		close(download_fd);
+		return -1;
 	}
 
-*/
-  	
-	
-	/*char buf[2048] = "12345";
-	int buf_size;
-	//buf_size = read_socket_reply(socket_request, buf);
-	/*buf_size = send(socket_request, buf, strlen(buf), 0);
-	printf("Bytes escritos %d\n", buf_size);*/
-    
+	if (read_reply(socket_data, NULL) != 0)
+	{
+		printf("ERROR IN COMMANDS\n");
+		close(socket_request);
+		fclose(socket_data);
+		close(download_fd);
+		return -1;
+	}
 
 	return 0;
 }
@@ -110,13 +136,13 @@ int socket_config (char *ip, int port)
 
 	return sockfd;
 }
+
 int send_command(int socketfd, char *command)
 {
-	printf("/**** Sending Commands ****/\n");
-	
+		
 	int bytes_sent = send(socketfd, command, strlen(command), 0);
-	//printf("OH CUM CRL\n");
-	if (bytes_sent < 0)
+	
+	if (bytes_sent <= 0)
 	{
 		printf("Error Sending Command\n");
 		return -1;
@@ -126,27 +152,78 @@ int send_command(int socketfd, char *command)
 	return 0;
 }
 
-int read_reply(int socketfd)
+int read_reply(FILE * socketf, char copy[])
 {
-	char *buf = malloc(MAX_STRING_SIZE);
-	ssize_t random = 0;
-	FILE *file = fdopen(socketfd, "r");
-
+	char buf [2048];
 	//printf("LEL\n");
-	while (getline(&buf, &random, file) != -1)
+	while(fgets(buf, 2048, socketf))
 	{
 		printf("< %s", buf);
-		//printf("LET ME SEE\n");
-		if (buf[3] == ' ')
-			break;
-		//printf("IM KILLING U BITCH\n");
+		if (copy != NULL)
+			strcpy(copy, buf);
+
 		if (buf[0] == '4' || buf[0] == '5')
 		{
-			printf("ERROR READING RESPONSE\n");
-			close(socketfd);
+			printf("Connection error\n");
 			return -1;
 		}
+
+		if(buf[3] == ' ')
+			break;
+
 	}
+	return 0;
+}
+
+int pasv_mode(int socketfd)
+{
+	char command[MAX_STRING_SIZE*2];
+	char buf[MAX_STRING_SIZE*4];
+	char *token;
+	int real_port;
+	
+	int port[2];
+
+	sprintf(command, "pasv\n");
+	printf ("COMMAND: %s\n", command);
+	send_command(socketfd, command);
+
+	FILE *socketf = fdopen(socketfd, "r");
+	if(read_reply(socketf, buf) < 0){
+		return -1;
+	}
+
+	strtok(buf, "(");
+	for (int i=0; i<4; i++)
+		token = strtok(NULL, ",");
+		
+	token = strtok(NULL, ",");
+	port[0] = (int)strtol(token, NULL, 10);
+	token = strtok(NULL, ")");
+	port[1] = (int)strtol(token, NULL, 10);
+
+	real_port = port[0]*256 + port[1];
+	printf("PORTA %d\n", real_port);
+
+	return real_port;
+}
+
+int download(int socketfd, char *filename)
+{
+	FILE *file = fopen(filename, "w+");
+	if(!file)
+	{
+		printf("ERROR CREATING FILE FOR DOWNLOAD\n");
+		return -1;
+	}
+	char buf[MAX_STRING_SIZE*2];
+	int bytes_read;
+
+	while((bytes_read = recv(socketfd, buf, MAX_STRING_SIZE*2, 0)) > 0)
+		fwrite(buf, bytes_read, 1, file);
+
+	fclose(file);
+
 	return 0;
 }
 
